@@ -1,18 +1,14 @@
 import pygame
-import copy
 from cell import Cell, CELL_SIZE
 from sudoku_generator import SudokuGenerator
 
-BLACK      = (0,   0,   0)
-WHITE      = (255, 255, 255)
-THICK      = 4   
-THIN       = 1   
+BLACK = (0, 0, 0)
+THICK = 4
+THIN  = 1
 
 
 class Board:
-
     def __init__(self, width, height, screen, difficulty):
-   
         self.width      = width
         self.height     = height
         self.screen     = screen
@@ -24,75 +20,88 @@ class Board:
         generator = SudokuGenerator(9, removed)
         generator.fill_values()
 
-        self.solution = copy.deepcopy(generator.get_board())
+        full_board = generator.get_board()
+        self.solution = []
+        for r in range(9):
+            solution_row = []
+            for c in range(9):
+                solution_row.append(full_board[r][c])
+            self.solution.append(solution_row)
 
-        
         generator.remove_cells()
-        puzzle = generator.get_board()  
+        puzzle = generator.get_board()
 
-        self.cells = [
-            [Cell(puzzle[r][c], r, c, screen) for c in range(9)]
-            for r in range(9)
-        ]
+        self.cells = []
+        for r in range(9):
+            cell_row = []
+            for c in range(9):
+                cell_row.append(Cell(puzzle[r][c], r, c, screen))
+            self.cells.append(cell_row)
 
-        self.original = copy.deepcopy(puzzle)
+        self.original = []
+        for r in range(9):
+            original_row = []
+            for c in range(9):
+                original_row.append(puzzle[r][c])
+            self.original.append(original_row)
 
-        self.selected_cell = None  
-
+        self.selected_cell = None
 
     def draw(self):
-    
-        for row in self.cells:
-            for cell in row:
-                cell.draw()
+        for r in range(9):
+            for c in range(9):
+                self.cells[r][c].draw()
 
         board_px = 9 * CELL_SIZE
         for i in range(10):
             width = THICK if i % 3 == 0 else THIN
-   
-            pygame.draw.line(self.screen, BLACK,
-                             (0, i * CELL_SIZE),
-                             (board_px, i * CELL_SIZE), width)
-      
-            pygame.draw.line(self.screen, BLACK,
-                             (i * CELL_SIZE, 0),
-                             (i * CELL_SIZE, board_px), width)
-
+            pygame.draw.line(self.screen, BLACK, (0, i * CELL_SIZE), (board_px, i * CELL_SIZE), width)
+            pygame.draw.line(self.screen, BLACK, (i * CELL_SIZE, 0), (i * CELL_SIZE, board_px), width)
 
     def select(self, row, col):
-        if self.selected_cell:
-            r, c = self.selected_cell
-            self.cells[r][c].selected = False
+        if self.selected_cell is not None:
+            prev_r = self.selected_cell[0]
+            prev_c = self.selected_cell[1]
+            self.cells[prev_r][prev_c].selected = False
         self.selected_cell = (row, col)
         self.cells[row][col].selected = True
 
     def click(self, x, y):
         board_px = 9 * CELL_SIZE
-        if 0 <= x < board_px and 0 <= y < board_px:
-            return y // CELL_SIZE, x // CELL_SIZE
-        return None
-
+        if x < 0 or x >= board_px:
+            return None
+        if y < 0 or y >= board_px:
+            return None
+        row = y // CELL_SIZE
+        col = x // CELL_SIZE
+        return row, col
 
     def clear(self):
-        if self.selected_cell:
-            r, c = self.selected_cell
-            cell = self.cells[r][c]
-            if not cell.locked:
-                cell.set_cell_value(0)
-                cell.set_sketched_value(0)
+        if self.selected_cell is None:
+            return
+        r = self.selected_cell[0]
+        c = self.selected_cell[1]
+        cell = self.cells[r][c]
+        if not cell.locked:
+            cell.set_cell_value(0)
+            cell.set_sketched_value(0)
 
     def sketch(self, value):
-        if self.selected_cell:
-            r, c = self.selected_cell
-            self.cells[r][c].set_sketched_value(value)
+        if self.selected_cell is None:
+            return
+        r = self.selected_cell[0]
+        c = self.selected_cell[1]
+        self.cells[r][c].set_sketched_value(value)
 
     def place_number(self, value):
-        if self.selected_cell:
-            r, c = self.selected_cell
-            cell = self.cells[r][c]
-            if not cell.locked:
-                cell.set_cell_value(value)
-                cell.set_sketched_value(0)   
+        if self.selected_cell is None:
+            return
+        r = self.selected_cell[0]
+        c = self.selected_cell[1]
+        cell = self.cells[r][c]
+        if not cell.locked:
+            cell.set_cell_value(value)
+            cell.set_sketched_value(0)
 
     def reset_to_original(self):
         for r in range(9):
@@ -100,21 +109,27 @@ class Board:
                 orig = self.original[r][c]
                 self.cells[r][c].value          = orig
                 self.cells[r][c].sketched_value = 0
-                self.cells[r][c].locked         = (orig != 0)
-
-        if self.selected_cell:
-            r, c = self.selected_cell
+                self.cells[r][c].locked         = orig != 0
+        if self.selected_cell is not None:
+            r = self.selected_cell[0]
+            c = self.selected_cell[1]
             self.cells[r][c].selected = False
             self.selected_cell = None
 
-
     def is_full(self):
-        return all(self.cells[r][c].value != 0
-                   for r in range(9) for c in range(9))
+        for r in range(9):
+            for c in range(9):
+                if self.cells[r][c].value == 0:
+                    return False
+        return True
 
     def update_board(self):
-        self.board = [[self.cells[r][c].value for c in range(9)]
-                      for r in range(9)]
+        self.board = []
+        for r in range(9):
+            board_row = []
+            for c in range(9):
+                board_row.append(self.cells[r][c].value)
+            self.board.append(board_row)
 
     def find_empty(self):
         for r in range(9):
